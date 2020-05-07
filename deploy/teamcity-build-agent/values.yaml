@@ -1,11 +1,11 @@
-# Default values for template.
+# Default values for teamcity-build-agent.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-replicaCount: 1
+replicaCount: 0
 
 image:
-  repository: nginx
+  repository: gcr.io/ajensen-1993/teamcity-build-agent
   pullPolicy: IfNotPresent
   tag: ""
 
@@ -13,9 +13,11 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
+priorityClassName: optional-preempting-pc
+
 serviceAccount:
   # Specifies whether a service account should be created
-  create: true
+  create: false
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.
@@ -25,32 +27,14 @@ serviceAccount:
 podAnnotations: {}
 
 podSecurityContext: {}
-# fsGroup: 2000
+  # fsGroup: 2000
 
-securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-# runAsUser: 1000
+securityContext:
+  privileged: true
 
 service:
   type: ClusterIP
   port: 80
-
-ingress:
-  enabled: false
-  annotations: {}
-    # kubernetes.io/ingress.class: nginx
-    # kubernetes.io/tls-acme: "true"
-  hosts:
-  - host: chart-example.local
-    paths: []
-  tls: []
-  #  - secretName: chart-example-tls
-  #    hosts:
-  #      - chart-example.local
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
@@ -64,15 +48,15 @@ resources: {}
   #   cpu: 100m
   #   memory: 128Mi
 
-autoscaling:
-  enabled: false
-  minReplicas: 1
-  maxReplicas: 100
-  targetCPUUtilizationPercentage: 80
-  # targetMemoryUtilizationPercentage: 80
-
 nodeSelector: {}
 
 tolerations: []
 
-affinity: {}
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - preference:
+        matchExpressions:
+        - key: cloud.google.com/gke-preemptible
+          operator: Exists
+      weight: 50
