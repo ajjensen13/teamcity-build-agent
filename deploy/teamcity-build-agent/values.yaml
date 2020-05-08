@@ -8,6 +8,11 @@ image:
   repository: gcr.io/ajensen-1993/teamcity-build-agent
   pullPolicy: IfNotPresent
   tag: ""
+  digest: ""
+
+env:
+- name: DOCKER_IN_DOCKER
+  value: start
 
 imagePullSecrets: []
 nameOverride: ""
