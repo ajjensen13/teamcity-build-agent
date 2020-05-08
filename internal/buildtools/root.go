@@ -18,11 +18,11 @@ package buildtools
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
-	"os"
-
 	"github.com/mitchellh/go-homedir"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"os"
+	"path/filepath"
 )
 
 var cfgFile string
@@ -34,6 +34,20 @@ var rootCmd = &cobra.Command{
 	Long:  ``,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if out != "" {
+			d := filepath.Dir(out)
+			fi, err := os.Stat(d)
+			switch {
+			case os.IsNotExist(err):
+				err = os.MkdirAll(d, 0755)
+				if err != nil {
+					return err
+				}
+			case err != nil:
+				return err
+			case !fi.IsDir():
+				return fmt.Errorf("%s exists but is not a directory", fi.Name())
+			}
+
 			out, err := os.Create(out)
 			if err != nil {
 				return err
