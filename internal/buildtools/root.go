@@ -30,13 +30,25 @@ var cfgFile string
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "buildtools",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "",
+	Long:  ``,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if out != "" {
+			out, err := os.Create(out)
+			if err != nil {
+				return err
+			}
+			os.Stdout = out
+		}
+		return nil
+	},
+	PersistentPostRunE: func(cmd *cobra.Command, args []string) (err error) {
+		if out != "" {
+			defer os.Stdout.Close()
+			_ = os.Stdout.Sync()
+		}
+		return
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -48,8 +60,13 @@ func Execute() {
 	}
 }
 
+var (
+	out string
+)
+
 func init() {
 	cobra.OnInitialize(initConfig)
+	rootCmd.PersistentFlags().StringVarP(&out, "out", "o", "", "output file (default STDOUT)")
 }
 
 // initConfig reads in config file and ENV variables if set.
