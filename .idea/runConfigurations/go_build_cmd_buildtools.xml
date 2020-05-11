@@ -1,0 +1,13 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="go build cmd/buildtools" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="teamcity-build-agent" />
+    <working_directory value="$PROJECT_DIR$/" />
+    <go_parameters value="-i" />
+    <parameters value="scrapbook --value image.digest=gcr.io/ajensen-1993/teamcity-build-agent:bootstrap=digest --label teamcity_build_id=bootstrap --out deploymentValueOverrides/values.yaml" />
+    <kind value="PACKAGE" />
+    <filePath value="$PROJECT_DIR$/" />
+    <package value="github.com/ajjensen13/teamcity-build-agent/cmd/buildtools" />
+    <directory value="$PROJECT_DIR$/cmd/buildtools" />
+    <method v="2" />
+  </configuration>
+</component>

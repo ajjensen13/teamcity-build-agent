@@ -16,14 +16,18 @@ import (
 
 const (
 	use   = `scrapbook`
-	short = `Generate value.yaml files from local docker images.`
-	long  = `Generate value.yaml files from local docker images.
+	short = `Generate value.yaml files from metadata about local docker images.`
+	long  = `Generate value.yaml files from metadata about local docker images.
 
 The following example generates a values.yaml file that maps
 image.tag to the digest value of the most recently build image
-named docker.io/example-image:12345
+named docker.io/example-image with tag 12345
 
-	teamcity tool scrapbook --value image.tag=docker.io/example-image:12345
+	buildtools scrapbook --value image.tag=docker.io/example-image:12345
+
+The following example uses a label filter to pick the local image having a particular label.
+
+	buildtools scrapbook --value image.tag=docker.io/example-image --label build_id=123
 `
 )
 
@@ -35,8 +39,10 @@ var scrapbookCmd = &cobra.Command{
 }
 
 const (
-	valuesFlagName     = "value"
-	valuesUsage        = `A value to include in the scrapbook. Example: yaml.key=docker/repository:tag`
+	valuesFlagName = "value"
+	valuesUsage    = `A value to include in the scrapbook. ` +
+		`Format: <key>=repository[:tag][=handler]. ` +
+		`Handlers can be one of Digest (default), ID, Repository, Tag, CreatedSince, CreatedAt, or Size. `
 	labelsFlagName     = "label"
 	labelsUsage        = `Label used to filter images by. Example: build=12345`
 	defaultHandlerName = "digest"
@@ -51,16 +57,16 @@ func init() {
 func run(cmd *cobra.Command, _ []string) {
 	values, err := cmd.Flags().GetStringArray(valuesFlagName)
 	if err != nil {
-		log.Panic(fmt.Errorf("error getting values from arguments: %w", err))
+		log.Panic(fmt.Errorf("buildtools: error getting values from arguments: %w", err))
 	}
 
 	if len(values) == 0 {
-		log.Fatalf("error getting values from arguments: did you forget to specify any with --%s", valuesFlagName)
+		log.Fatalf("buildtools: error getting values from arguments: did you forget to specify any with --%s", valuesFlagName)
 	}
 
 	labels, err := cmd.Flags().GetStringArray(labelsFlagName)
 	if err != nil {
-		log.Panic(fmt.Errorf("error getting labels from arguments: %w", err))
+		log.Panic(fmt.Errorf("buildtools: error getting labels from arguments: %w", err))
 	}
 
 	var filters []imageFilter
@@ -74,9 +80,9 @@ func run(cmd *cobra.Command, _ []string) {
 		var key, repository, handler, tag string
 		switch len(s) {
 		case 0:
-			log.Fatalf("missing key in value %d: %q", ndx, spec)
+			log.Fatalf("buildtools: missing key in value %d: %q", ndx, spec)
 		case 1:
-			log.Fatalf("missing repository in value %d: %q", ndx, spec)
+			log.Fatalf("buildtools: missing repository in value %d: %q", ndx, spec)
 		case 2:
 			key = s[0]
 			repository, tag = splitRepoAndTag(s[1])
@@ -84,18 +90,21 @@ func run(cmd *cobra.Command, _ []string) {
 		case 3:
 			key = s[0]
 			repository, tag = splitRepoAndTag(s[1])
-			handler = s[2]
+			handler = strings.ToLower(s[2])
 		}
 
-		err := builder.provideHandler(cmd.Context(), handler)(cmd.Context(), key, repository, tag, filters)
+		image, err := builder.image(cmd.Context(), repository, tag, filters)
 		if err != nil {
-			log.Fatal(fmt.Errorf("error while building value for spec %s [%d]: %w", spec, ndx, err))
+			log.Fatal(fmt.Errorf("buildtools: error while building value for spec %s [%d]: %w", spec, ndx, err))
 		}
+
+		v := image.fieldByName(handler)
+		builder.add(key, v)
 	}
 
 	err = yaml.NewEncoder(os.Stdout).Encode(builder)
 	if err != nil {
-		log.Fatal(fmt.Errorf("error while generating values: %w", err))
+		log.Fatal(fmt.Errorf("buildtools: error while generating values: %w", err))
 	}
 }
 
@@ -107,7 +116,7 @@ func splitRepoAndTag(repoAndTag string) (repo, tag string) {
 	case 2:
 		return s[0], s[1]
 	default:
-		log.Fatal(fmt.Errorf("failed to parse repository string: %v", repoAndTag))
+		log.Fatal(fmt.Errorf("buildtools: failed to parse repository string: %v", repoAndTag))
 	}
 	//noinspection GoUnreachableCode
 	panic("unreachable")
@@ -115,7 +124,7 @@ func splitRepoAndTag(repoAndTag string) (repo, tag string) {
 
 type yamlBuilder map[string]interface{}
 
-func (v yamlBuilder) add(key, value string) {
+func (v yamlBuilder) add(key string, value interface{}) {
 	s := strings.SplitN(key, ".", 2)
 	root := s[0]
 
@@ -130,32 +139,24 @@ func (v yamlBuilder) add(key, value string) {
 	}
 }
 
-func (v yamlBuilder) provideHandler(ctx context.Context, handler string) func(ctx context.Context, key, repository, tag string, filters []imageFilter) error {
-	switch handler {
-	case "digest":
-		return func(ctx context.Context, key, repository, tag string, filters []imageFilter) error {
-			dockerImages, err := images(ctx, repository)
-			if err != nil {
-				return err
-			}
-
-			// This extra filtering is necessary because tag filtering messes up digest reporting
-			// https://github.com/moby/moby/issues/29901
-			dockerImages = filterByTag(tag, dockerImages)
-
-			digest, err := latestDigest(ctx, dockerImages)
-			if err != nil {
-				return err
-			}
-
-			v.add(key, digest)
-			return nil
-		}
-	default:
-		log.Fatalf("unknown handler %q", handler)
+func (v yamlBuilder) image(ctx context.Context, repository, tag string, filters []imageFilter) (*dockerImage, error) {
+	dockerImages, err := images(ctx, repository, filters)
+	if err != nil {
+		return nil, err
 	}
-	//noinspection GoUnreachableCode
-	panic("unreachable")
+
+	log.Printf("buildtools: found %d images for %q", len(dockerImages), repository)
+
+	// This extra filtering is necessary because tag filtering messes up digest reporting
+	// https://github.com/moby/moby/issues/29901
+	dockerImages = filterByTag(tag, dockerImages)
+
+	result, err := latestImage(dockerImages)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 func filterByTag(tag string, dockerImages []dockerImage) []dockerImage {
@@ -169,6 +170,8 @@ func filterByTag(tag string, dockerImages []dockerImage) []dockerImage {
 			result = append(result, image)
 		}
 	}
+
+	log.Printf("buildtools: filtered %d images by tag %q resulting in %d results", len(dockerImages), tag, len(result))
 	return result
 }
 
@@ -182,13 +185,37 @@ type dockerImage struct {
 	Size         string
 }
 
+func (i *dockerImage) fieldByName(name string) interface{} {
+	switch strings.ToLower(name) {
+	case "id":
+		return i.ID
+	case "repository":
+		return i.Repository
+	case "tag":
+		return i.Tag
+	case "digest":
+		return i.Digest
+	case "createsince":
+		return i.CreatedSince
+	case "createdat":
+		return i.CreatedAt
+	case "size":
+		return i.Size
+	default:
+		log.Fatalf("buildtools: unknown handler: %q", name)
+	}
+
+	//noinspection GoUnreachableCode
+	panic("unreachable")
+}
+
 type imageFilter string
 
 func labelFilter(filter string) imageFilter {
 	return imageFilter(fmt.Sprintf(`label=%s`, filter))
 }
 
-func images(ctx context.Context, repository string, filters ...imageFilter) ([]dockerImage, error) {
+func images(ctx context.Context, repository string, filters []imageFilter) ([]dockerImage, error) {
 	const formatTemplate = `{{ .ID }},{{ .Repository }},{{ .Tag }},{{ .Digest }},{{ .CreatedSince }},{{ .CreatedAt }},{{ .Size }},`
 	arguments := []string{"images", repository, "--format", formatTemplate, "--digests"}
 	for _, filter := range filters {
@@ -196,18 +223,18 @@ func images(ctx context.Context, repository string, filters ...imageFilter) ([]d
 	}
 
 	cmd := exec.CommandContext(ctx, "docker", arguments...)
-	// fmt.Fprintf(os.Stderr, "executing command: %v\n", cmd)
+	log.Printf("buildtools: executing command: %v", cmd)
 
 	var output []byte
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("buildtools: error while executing command to get images: %w", err)
 	}
 
 	cr := csv.NewReader(bytes.NewReader(output))
 	rs, err := cr.ReadAll()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("buildtools: error while parsing images from command: %w", err)
 	}
 
 	result := make([]dockerImage, len(rs))
@@ -234,12 +261,12 @@ func images(ctx context.Context, repository string, filters ...imageFilter) ([]d
 	return result, nil
 }
 
-func latestDigest(ctx context.Context, dockerImages []dockerImage) (string, error) {
+func latestImage(dockerImages []dockerImage) (*dockerImage, error) {
 	switch len(dockerImages) {
 	case 1:
-		return dockerImages[0].Digest, nil
+		return &dockerImages[0], nil
 	case 0:
-		return "", fmt.Errorf("image not found")
+		return nil, fmt.Errorf("buildtools: image not found")
 	default:
 		result := &dockerImages[0]
 		for _, image := range dockerImages {
@@ -247,6 +274,6 @@ func latestDigest(ctx context.Context, dockerImages []dockerImage) (string, erro
 				result = &image
 			}
 		}
-		return result.Digest, nil
+		return result, nil
 	}
 }
