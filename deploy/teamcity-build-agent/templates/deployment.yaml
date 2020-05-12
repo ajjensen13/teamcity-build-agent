@@ -40,7 +40,10 @@ spec:
         env:
         {{- toYaml .Values.env | nindent 8 }}
         resources:
-      {{- toYaml .Values.resources | nindent 10 }}
+        {{- toYaml .Values.resources | nindent 10 }}
+      {{- with .Values.serviceAccount }}
+      serviceAccountName: {{ .name }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
       {{- toYaml . | nindent 8 }}
