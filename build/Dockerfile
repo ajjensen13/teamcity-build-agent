@@ -22,7 +22,7 @@ RUN curl -sL https://deb.nodesource.com/setup_12.x | bash - && \
     apt-get update
 RUN apt-get install -yq nodejs dart gcc g++ make man && \
     apt-get clean -q all
-ENV PATH="$HOME/.pub-cache/bin:/usr/lib/dart/bin:$PATH"
+ENV PATH="/root/.pub-cache/bin:/usr/lib/dart/bin:$PATH"
 RUN pub global activate webdev
 COPY --from=build-buildtools  /bin/buildtools /bin/buildtools
 COPY ./build/setup-config.sh /services/
