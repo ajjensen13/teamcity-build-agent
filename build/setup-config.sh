@@ -27,3 +27,7 @@ command -v go > /dev/null && \
   printf "go.path=%s\n" "$(command -v go)" >> "$PROPERTIES_FILE" && \
   printf "go.version=%s\n" "$(go version)" >> "$PROPERTIES_FILE"
 
+command -v ng > /dev/null && \
+  printf "ng.path=%s\n" "$(command -v ng)" >> "$PROPERTIES_FILE" && \
+  printf "ng.version=%s\n" "$(ng version | grep "Angular CLI")" >> "$PROPERTIES_FILE"
+
