@@ -30,6 +30,7 @@ podSecurityContext: {}
 
 securityContext:
   privileged: true
+  runAsUser: 0
 
 service:
   type: ClusterIP
