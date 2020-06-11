@@ -14,6 +14,10 @@
               <option name="name" value="SERVER_URL" />
               <option name="value" value="http://example.com" />
             </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="DOCKER_IN_DOCKER" />
+              <option name="value" value="start" />
+            </DockerEnvVarImpl>
           </list>
         </option>
         <option name="commandLineOptions" value="" />

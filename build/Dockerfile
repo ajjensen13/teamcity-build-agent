@@ -33,4 +33,4 @@ RUN GOOS=linux GOARCH=amd64 go build -gcflags "$GCFLAGS" -o /bin/buildtools ./cm
 FROM base as run
 COPY --from=build-buildtools  /bin/buildtools /bin/buildtools
 COPY ./build/setup-config.sh /services/
-USER buildagent
+COPY ./build/run-services.sh /run-services.sh
