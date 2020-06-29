@@ -3,10 +3,7 @@ ARG ALPINE_VERSION=3.11
 
 FROM jetbrains/teamcity-agent as base
 USER root
-# RUN echo "root ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/root_nopasswd && chmod 0440 /etc/sudoers.d/root_nopasswd
 
-RUN apt-get update -q && \
-    apt-get upgrade -yq
 RUN add-apt-repository ppa:longsleep/golang-backports && \
     curl -sL https://deb.nodesource.com/setup_12.x | bash - && \
     curl -sL https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - && \
