@@ -42,7 +42,7 @@ const (
 	valuesFlagName = "value"
 	valuesUsage    = `A value to include in the scrapbook. ` +
 		`Format: <key>=repository[:tag][=handler]. ` +
-		`Handlers can be one of Digest (default), ID, Repository, Tag, CreatedSince, CreatedAt, or Size. `
+		`Handlers can be one of Digest (default), ID, Repository, Tag, CreatedSince, CreatedAt, Size, or Full. `
 	labelsFlagName     = "label"
 	labelsUsage        = `Label used to filter images by. Example: build=12345`
 	defaultHandlerName = "digest"
@@ -201,6 +201,8 @@ func (i *dockerImage) fieldByName(name string) interface{} {
 		return i.CreatedAt
 	case "size":
 		return i.Size
+	case "full":
+		return fmt.Sprintf("%s@%s", i.Repository, i.Digest)
 	default:
 		log.Fatalf("buildtools: unknown handler: %q", name)
 	}
