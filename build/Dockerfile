@@ -1,7 +1,8 @@
 ARG GO_VERSION=1
 ARG ALPINE_VERSION=3.11
+ARG TEAMCITY_VERSION=2020.2.1
 
-FROM jetbrains/teamcity-agent as base
+FROM jetbrains/teamcity-agent:${TEAMCITY_VERSION}-linux-sudo as base
 USER root
 
 RUN add-apt-repository ppa:longsleep/golang-backports && \
