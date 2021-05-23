@@ -18,8 +18,6 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
-priorityClassName:
-
 serviceAccount:
   name: teamcity-build-agent-sa
 
